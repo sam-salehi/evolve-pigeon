@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "libs/*",
+]
+
+[package]
+name = "pigeon"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]

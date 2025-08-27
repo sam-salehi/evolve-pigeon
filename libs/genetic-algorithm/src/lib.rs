@@ -296,7 +296,8 @@ mod tests {
 
 
         for _ in 0..10 {
-            population = ga.evolve(&mut rng, &population);
+            let (new_population, _) = ga.evolve(&mut rng, &population);
+            population = new_population
         };
         
         let expected_population = vec![

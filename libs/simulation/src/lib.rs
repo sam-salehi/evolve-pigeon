@@ -2,7 +2,10 @@ use nalgebra as na;
 use lib_neural_network as nn;
 use lib_genetic_algorithm as ga;
 use self::animal_individual::*;
+use rand::prelude::*;
+use rayon::prelude::*;
 use rand::{Rng,RngCore};
+use rand::thread_rng;
 
 pub use self::{animal::*,food::*,world::*,eye::*,brain::*};
 
@@ -14,28 +17,60 @@ mod eye;
 mod brain;
 
 
+
+
+pub struct ParralelEngine {
+    pub sims: Vec<Simulation>,
+}
+
+
+impl ParralelEngine {
+     
+    pub fn new() -> Self {
+
+        let sims: Vec<Simulation> = (0..3)
+            .map(|_| Simulation::random()
+            .collect();
+
+        Self { sims }
+    }
+
+    pub fn step_all(&mut self) {
+        self.sims.par_iter_mut().for_each(|sim| sim.step(&mut thread_rng()); // TODO: refactor later
+        // such that each simulation has its own rng that it uses in step 
+        //
+    }
+
+    pub fn eval_all(&mut self) -> Vec<Logistic> {
+        self.sims.par_iter().map(|sim| sim.logistics()).collect()
+    }
+
+}
+
+
 use std::{f32::consts::FRAC_PI_2, thread::current};
 const SPEED_MIN: f32 = 0.001;
 const SPEED_MAX: f32 = 0.005;
 const SPEED_ACCEL: f32 = 0.2;
 const ROTATION_ACCEL: f32 = FRAC_PI_2;
-const GENERATION_LENGTH: usize = 2500;
+const GENERATION_LENGTH: usize = 2500; // the simulation runs for GENERATION_LENGTH before stopping.
 pub struct Simulation {
     world: World,
+    rng: StdRng,
     ga: ga::GeneticAlgorithm<ga::RouletteWheelSelection>,
     age: usize
 }
 
 impl Simulation {
     pub fn random(rng: &mut dyn RngCore) -> Self {
-        let world = World::random(rng);
+        let world = World::random(rng);  
         let ga = ga::GeneticAlgorithm::new(
             ga::RouletteWheelSelection,
             ga::UniformCrossOver,
             ga::GuassianMutation::new(0.01,0.03)
         );
 
-        Self {world, ga, age:0}
+        Self {world,rng,ga,age:0}
     }
 
     pub fn world(&self) -> &World {
@@ -125,9 +160,18 @@ impl Simulation {
         }
     }
 
+
+    fn logistics(&self) -> Logistic {
+        // score is the avrage fitness of animals.
+        todo!()
+    }
+
 }
 
 
-
-
+struct Logistic {
+    sim_id: f32,
+    total_fitness: f32,
+    avg_fitness: f32,
+}
 

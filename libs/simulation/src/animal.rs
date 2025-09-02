@@ -43,6 +43,9 @@ impl Animal {
     pub fn rotation(&self) -> na::Rotation2<f32> {
         self.rotation
     }
+    pub fn satiation(&self) -> usize { 
+        self.satiation
+    }
 
     
     fn new(eye: Eye, brain: Brain, rng: &mut dyn RngCore) -> Self {

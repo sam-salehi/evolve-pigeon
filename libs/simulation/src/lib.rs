@@ -24,6 +24,22 @@ pub struct ParallelEngine {
     pub sims: Vec<Simulation>,
 }
 
+// Used for running initalizing simulations. Helpful for finding optimal params 
+// pub Struct Config {
+//     fov_range: f32,
+//     fov_distance: f32,
+//     animal_count: usize, // 20,500
+//     food_count: usize, //  20, 500
+//     lifetime: usize, // number of steps before evolution 
+//     brain_size: usize, 
+//     mutation_rate: f32,
+//     selection_algorithm: todo!(), // Make a trait that gets implemented. Selection algorihtm
+//                                   // follows the trait 
+//     mutation_size: 0
+//
+// }
+
+
 impl ParallelEngine {
     pub fn new() -> Self {
         let sims: Vec<Simulation> = (0..3).map(|_| Simulation::random()).collect();

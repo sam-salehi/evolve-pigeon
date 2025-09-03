@@ -53,7 +53,6 @@ impl Simulation {
     pub fn new() -> Self {
         let mut rng = thread_rng();
         let sim = sim::Simulation::random();
-
         Self { rng, sim }
     }
 

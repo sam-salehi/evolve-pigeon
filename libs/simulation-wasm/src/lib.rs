@@ -30,16 +30,12 @@ impl ParallelEngine {
         self.eng.train(id);
     }
 
-    pub fn worlds(&mut self) -> Vec<JsValue> {
-        // TODO: fix this. Look below. Be slow and idiomatic.
+    pub fn worlds(&mut self) -> Vec<World> {
         self.eng
             .worlds()
             .into_iter()
             .map(|(id, world)| {
-                let obj = js_sys::Object::new();
-                js_sys::Reflect::set(&obj, &"id".into(), &JsValue::from_str(&id)).unwrap();
-                js_sys::Reflect::set(&obj, &"world".into(), &JsValue::from(world)).unwrap();
-                JsValue::from(obj)
+               World::from_with_id(world,id) 
             })
             .collect()
     }
@@ -78,9 +74,19 @@ impl Simulation {
     }
 }
 
+
+pub trait FromWithId<T,Id> {
+    fn from_with_id(value:T, id:Id) -> Self;
+}
+
+
+
 #[wasm_bindgen]
 #[derive(Clone, Debug)]
 pub struct World {
+    #[wasm_bindgen(getter_with_clone)]
+    pub id: String,
+
     #[wasm_bindgen(getter_with_clone)]
     pub animals: Vec<Animal>,
 
@@ -92,7 +98,15 @@ impl From<&sim::World> for World {
     fn from(world: &sim::World) -> Self {
         let animals = world.animals().iter().map(Animal::from).collect();
         let foods = world.foods().iter().map(Food::from).collect();
-        Self { animals, foods }
+        Self { id:"null".to_string(), animals, foods }
+    }
+}
+
+impl FromWithId<&sim::World,String> for World {
+    fn from_with_id(world: &sim::World, id:String) -> Self {
+        let mut base = World::from(world);
+        base.id = id;
+        base
     }
 }
 

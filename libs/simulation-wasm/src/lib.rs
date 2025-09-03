@@ -1,7 +1,49 @@
-use wasm_bindgen::prelude::*;
+use js_sys;
 use lib_simulation as sim;
 use rand::prelude::*;
+use uuid::Uuid;
+use wasm_bindgen::JsValue;
+use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
+pub struct ParallelEngine {
+    rng: ThreadRng,
+    eng: sim::ParallelEngine,
+}
+
+#[wasm_bindgen]
+impl ParallelEngine {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        let mut rng = thread_rng();
+        let eng = sim::ParallelEngine::new();
+
+        Self { rng, eng }
+    }
+
+    pub fn step_all(&mut self) {
+        self.eng.step_all();
+    }
+
+    pub fn train(&mut self, id: &str) {
+        let id = Uuid::parse_str(id).unwrap();
+        self.eng.train(id);
+    }
+
+    pub fn worlds(&mut self) -> Vec<JsValue> {
+        // TODO: fix this. Look below. Be slow and idiomatic.
+        self.eng
+            .worlds()
+            .into_iter()
+            .map(|(id, world)| {
+                let obj = js_sys::Object::new();
+                js_sys::Reflect::set(&obj, &"id".into(), &JsValue::from_str(&id)).unwrap();
+                js_sys::Reflect::set(&obj, &"world".into(), &JsValue::from(world)).unwrap();
+                JsValue::from(obj)
+            })
+            .collect()
+    }
+}
 
 #[wasm_bindgen]
 pub struct Simulation {
@@ -9,16 +51,14 @@ pub struct Simulation {
     sim: sim::Simulation,
 }
 
-
 #[wasm_bindgen]
 impl Simulation {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         let mut rng = thread_rng();
-        let sim = sim::Simulation::random(&mut rng);
+        let sim = sim::Simulation::random();
 
-        Self { rng, sim}
-
+        Self { rng, sim }
     }
 
     pub fn world(&self) -> World {
@@ -26,24 +66,20 @@ impl Simulation {
     }
 
     pub fn step(&mut self) {
-        self.sim.step(&mut self.rng);
+        self.sim.step();
     }
 
     pub fn train(&mut self) -> String {
-        let stats = self.sim.train(&mut self.rng);
+        let stats = self.sim.train();
         format!(
             "min={:.2}, max={:.2}, avg={:.2}",
-            stats.min_fitness,
-            stats.max_fitness,
-            stats.avg_fitness,
+            stats.min_fitness, stats.max_fitness, stats.avg_fitness,
         )
     }
 }
 
-
-
 #[wasm_bindgen]
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct World {
     #[wasm_bindgen(getter_with_clone)]
     pub animals: Vec<Animal>,
@@ -60,14 +96,13 @@ impl From<&sim::World> for World {
     }
 }
 
-
-
 #[wasm_bindgen]
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct Animal {
     pub x: f32,
     pub y: f32,
     pub rotation: f32,
+    pub satiation: usize,
 }
 
 impl From<&sim::Animal> for Animal {
@@ -75,13 +110,14 @@ impl From<&sim::Animal> for Animal {
         Self {
             x: animal.position().x,
             y: animal.position().y,
-            rotation: animal.rotation().angle()
+            rotation: animal.rotation().angle(),
+            satiation: animal.satiation(),
         }
     }
 }
 
 #[wasm_bindgen]
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct Food {
     pub x: f32,
     pub y: f32,
@@ -91,10 +127,7 @@ impl From<&sim::Food> for Food {
     fn from(food: &sim::Food) -> Self {
         Self {
             x: food.position().x,
-            y: food.position().y
+            y: food.position().y,
         }
     }
 }
-
-
-

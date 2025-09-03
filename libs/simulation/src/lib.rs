@@ -1,99 +1,123 @@
-use nalgebra as na;
-use lib_neural_network as nn;
-use lib_genetic_algorithm as ga;
 use self::animal_individual::*;
+use lib_genetic_algorithm as ga;
+use lib_neural_network as nn;
+use nalgebra as na;
 use rand::prelude::*;
-use rayon::prelude::*;
-use rand::{Rng,RngCore};
 use rand::thread_rng;
+use rand::{Rng, RngCore};
+use rayon::iter::{
+    IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
+};
+use rayon::prelude::*;
+use uuid::Uuid;
 
-pub use self::{animal::*,food::*,world::*,eye::*,brain::*};
+pub use self::{animal::*, brain::*, eye::*, food::*, world::*};
 
 mod animal;
 mod animal_individual;
+mod brain;
+mod eye;
 mod food;
 mod world;
-mod eye;
-mod brain;
 
-
-
-
-pub struct ParralelEngine {
+pub struct ParallelEngine {
     pub sims: Vec<Simulation>,
 }
 
-
-impl ParralelEngine {
-     
+impl ParallelEngine {
     pub fn new() -> Self {
-
-        let sims: Vec<Simulation> = (0..3)
-            .map(|_| Simulation::random()
-            .collect();
+        let sims: Vec<Simulation> = (0..3).map(|_| Simulation::random()).collect();
 
         Self { sims }
     }
 
     pub fn step_all(&mut self) {
-        self.sims.par_iter_mut().for_each(|sim| sim.step(&mut thread_rng()); // TODO: refactor later
-        // such that each simulation has its own rng that it uses in step 
-        //
+        let stats = self.sims.par_iter_mut().for_each(|sim| {
+            sim.step();
+        });
+        stats
     }
 
-    pub fn eval_all(&mut self) -> Vec<Logistic> {
+    pub fn worlds(&mut self) -> Vec<(String, &World)> {
+        self.sims
+            .iter()
+            .map(|sim| (sim.id().to_string(), sim.world()))
+            .collect()
+    }
+
+    pub fn train(&mut self, id: Uuid) {
+        if let Some(sim) = self.sims.iter_mut().find(|sim| sim.id == id) {
+            sim.train();
+        } else {
+            panic!("Given id {:?} not found in running sims.", id)
+        }
+    }
+
+    pub fn eval_all(&self) -> Vec<Logistic> {
         self.sims.par_iter().map(|sim| sim.logistics()).collect()
     }
-
 }
 
-
-use std::{f32::consts::FRAC_PI_2, thread::current};
+use std::f32::consts::FRAC_PI_2;
 const SPEED_MIN: f32 = 0.001;
 const SPEED_MAX: f32 = 0.005;
 const SPEED_ACCEL: f32 = 0.2;
 const ROTATION_ACCEL: f32 = FRAC_PI_2;
 const GENERATION_LENGTH: usize = 2500; // the simulation runs for GENERATION_LENGTH before stopping.
+
 pub struct Simulation {
+    id: Uuid,
     world: World,
-    rng: StdRng,
+    rng: ThreadRng,
     ga: ga::GeneticAlgorithm<ga::RouletteWheelSelection>,
-    age: usize
+    age: usize,
 }
 
+// Signifying traits are fine to be used.
+unsafe impl Send for Simulation {}
+unsafe impl Sync for Simulation {}
+
 impl Simulation {
-    pub fn random(rng: &mut dyn RngCore) -> Self {
-        let world = World::random(rng);  
+    pub fn random() -> Self {
+        let world = World::random(&mut thread_rng());
+        let rng = thread_rng();
         let ga = ga::GeneticAlgorithm::new(
             ga::RouletteWheelSelection,
             ga::UniformCrossOver,
-            ga::GuassianMutation::new(0.01,0.03)
+            ga::GuassianMutation::new(0.01, 0.03),
         );
 
-        Self {world,rng,ga,age:0}
+        Self {
+            id: Uuid::new_v4(),
+            world,
+            rng,
+            ga,
+            age: 0,
+        }
     }
 
     pub fn world(&self) -> &World {
         &self.world
     }
 
-    pub fn step(&mut self,rng: &mut dyn RngCore) -> Option<ga::Statistics> {
+    pub fn step(&mut self) -> Option<ga::Statistics> {
         self.process_movements();
         self.process_brains();
-        self.process_collisions(rng);
+        self.process_collisions();
 
         self.age += 1;
 
         if self.age > GENERATION_LENGTH {
-            Some(self.evolve(rng))
+            let mut temp_rng = thread_rng();
+            Some(self.evolve(&mut temp_rng))
         } else {
             None
         }
     }
 
-    pub fn train(&mut self, rng:&mut dyn RngCore) -> ga::Statistics {
+    pub fn train(&mut self) -> ga::Statistics {
         loop {
-            if let Some(summary) = self.step(rng) {
+            if let Some(summary) = self.step() {
                 return summary;
             }
         }
@@ -101,14 +125,14 @@ impl Simulation {
 
     fn evolve(&mut self, rng: &mut dyn RngCore) -> ga::Statistics {
         self.age = 0;
-        let current_population: Vec<_> = self 
-            .world 
-            .animals 
+        let current_population: Vec<_> = self
+            .world
+            .animals
             .iter()
             .map(AnimalIndividual::from_animal)
             .collect();
 
-        let (evolved_population, stats) = self.ga.evolve(rng,&current_population);
+        let (evolved_population, stats) = self.ga.evolve(rng, &current_population);
 
         self.world.animals = evolved_population
             .into_iter()
@@ -124,54 +148,82 @@ impl Simulation {
 
     fn process_movements(&mut self) {
         for animal in &mut self.world.animals {
-            animal.position += animal.rotation * na::Vector2::new(0.0,animal.speed);
+            animal.position += animal.rotation * na::Vector2::new(0.0, animal.speed);
 
-            animal.position.x = na::wrap(animal.position.x,0.0,1.0);
-            animal.position.y = na::wrap(animal.position.y,0.0,1.0);
+            animal.position.x = na::wrap(animal.position.x, 0.0, 1.0);
+            animal.position.y = na::wrap(animal.position.y, 0.0, 1.0);
         }
     }
 
     fn process_brains(&mut self) {
         for animal in &mut self.world.animals {
-            let vision = animal.eye.process_vision(
-                animal.position, 
-                animal.rotation, 
-                &self.world.foods
-            );
+            let vision =
+                animal
+                    .eye
+                    .process_vision(animal.position, animal.rotation, &self.world.foods);
             let response = animal.brain.nn.propogate(vision);
             let speed = response[0].clamp(-SPEED_ACCEL, SPEED_ACCEL);
-            let rotation = response[1].clamp(-ROTATION_ACCEL,ROTATION_ACCEL);
+            let rotation = response[1].clamp(-ROTATION_ACCEL, ROTATION_ACCEL);
 
-            animal.speed = (animal.speed + speed).clamp(SPEED_MIN,SPEED_MAX);
+            animal.speed = (animal.speed + speed).clamp(SPEED_MIN, SPEED_MAX);
             animal.rotation = na::Rotation2::new(animal.rotation.angle() + rotation);
         }
     }
 
-    fn process_collisions(&mut self, rng: &mut dyn RngCore) {
+    fn process_collisions(&mut self) {
         for animal in &mut self.world.animals {
             for food in &mut self.world.foods {
                 let distance = na::distance(&animal.position, &food.position);
 
                 if distance <= 0.01 {
                     animal.satiation += 1;
-                    food.position = rng.r#gen();
+                    food.position = self.rng.r#gen();
                 }
             }
         }
     }
 
+    fn id(&self) -> Uuid {
+        self.id
+    }
 
     fn logistics(&self) -> Logistic {
         // score is the avrage fitness of animals.
-        todo!()
+        let mut max_fitness: usize = 0;
+        let mut total_fitness: usize = 0;
+        for animal in &self.world.animals {
+            total_fitness += animal.satiation();
+            max_fitness = max_fitness.max(animal.satiation());
+        }
+
+        Logistic {
+            sim_id: self.id,
+            total_fitness,
+            avg_fitness: total_fitness / self.world.animals.len(),
+            apex_fitness: max_fitness,
+        }
     }
-
 }
 
-
-struct Logistic {
-    sim_id: f32,
-    total_fitness: f32,
-    avg_fitness: f32,
+#[derive(Debug)]
+pub struct Logistic {
+    sim_id: Uuid,
+    total_fitness: usize,
+    avg_fitness: usize,
+    apex_fitness: usize,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_parralel_engine() {
+        let mut eng = ParallelEngine::new();
+        for _ in 0..10 {
+            eng.step_all();
+        }
+        let eval = eng.eval_all();
+        println!("{:?}", eval[0])
+    }
+}

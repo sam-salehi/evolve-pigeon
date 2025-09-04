@@ -13,6 +13,7 @@ pub struct Eye {
     cells: usize
 }
 
+
 impl Eye {
 
     fn new(fov_range:f32, fov_angle:f32, cells:usize) -> Self {
@@ -23,7 +24,11 @@ impl Eye {
         Self { fov_range, fov_angle, cells}
     }
 
-    pub  fn cells(&self) -> usize {
+    fn from(fov_range:f32, fov_angle:f32, cells:usize) -> Self {
+        Eye::new(fov_range,fov_angle,CELLS)
+    }
+
+    pub fn cells(&self) -> usize {
         self.cells
     }
 

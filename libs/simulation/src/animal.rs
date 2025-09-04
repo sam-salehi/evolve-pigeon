@@ -11,12 +11,19 @@ pub struct Animal {
     pub(crate) satiation: usize, // Number of foods eaten
 }
 
+impl FromWithRng<Animal> for Animal {
+    pub fn from_with_rng(cfg: &Config, rng: &mut dyn RngCore) -> Animal {
+        let eye = Eye::from(cfg.fov_range,cfg.fov_angle);
+        let brain = Brain::random(rng,&eye);
+        Self::new(eye,brain,rng);
+    }
+}
+
 impl Animal {
     pub fn random(rng: &mut dyn RngCore) -> Self {
 
         let eye = Eye::default();
-        let brain = Brain::random(rng,&eye);
-
+        let brain = Brain:: random(rng,&eye);
         Self::new(eye,brain,rng)
 
     }
@@ -27,10 +34,8 @@ impl Animal {
     ) -> Self {
         let eye = Eye::default();
         let brain = Brain::from_chromosome(chromosome, &eye);
-
         Self::new(eye, brain, rng)
     }
-
 
     pub(crate) fn as_chromosome(&self) -> ga::Chromosome {
         self.brain.as_chromosome()
@@ -43,6 +48,7 @@ impl Animal {
     pub fn rotation(&self) -> na::Rotation2<f32> {
         self.rotation
     }
+
     pub fn satiation(&self) -> usize { 
         self.satiation
     }

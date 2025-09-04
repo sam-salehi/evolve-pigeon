@@ -25,19 +25,19 @@ pub struct ParallelEngine {
 }
 
 // Used for running initalizing simulations. Helpful for finding optimal params 
-// pub Struct Config {
-//     fov_range: f32,
-//     fov_distance: f32,
-//     animal_count: usize, // 20,500
-//     food_count: usize, //  20, 500
-//     lifetime: usize, // number of steps before evolution 
-//     brain_size: usize, 
-//     mutation_rate: f32,
-//     selection_algorithm: todo!(), // Make a trait that gets implemented. Selection algorihtm
-//                                   // follows the trait 
-//     mutation_size: 0
-//
-// }
+pub struct Config {
+    fov_range: f32, //done 
+    fov_distance: f32, //done 
+    animal_count: usize, // 20,500 (done)
+    food_count: usize, //  20, 500 (done)
+    lifetime: usize, // number of steps before evolution 
+    brain_size: usize, 
+    mutation_rate: f32,
+    selection_algorithm: todo!(), // Make a trait that gets implemented. Selection algorihtm
+                                  // follows the trait 
+    mutation_size: 0
+
+}
 
 
 impl ParallelEngine {
@@ -89,9 +89,24 @@ pub struct Simulation {
     age: usize,
 }
 
-// Signifying traits are fine to be used.
+// Signifying traits are  to be used by rayon.
 unsafe impl Send for Simulation {}
 unsafe impl Sync for Simulation {}
+
+impl From<Config> for Simulation {
+    fn from(cfg: Config) -> Self {
+        let world = World::from(&cfg);
+        let rng = thread_rng();
+        let ga = ga::GeneticAlgorithm::from(&cfg);
+        Self {
+            id: Uuid::new_v4(),
+            world,
+            rng,
+            ga,
+            age:0
+        }
+    }
+}
 
 impl Simulation {
     pub fn random() -> Self {
@@ -99,7 +114,7 @@ impl Simulation {
         let rng = thread_rng();
         let ga = ga::GeneticAlgorithm::new(
             ga::RouletteWheelSelection,
-            ga::UniformCrossOver,
+            ga::UniformCrossOver
             ga::GuassianMutation::new(0.01, 0.03),
         );
 

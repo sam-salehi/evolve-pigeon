@@ -7,6 +7,8 @@ pub struct Brain {
 }
 
 
+
+
 impl Brain {
     pub fn random(rng: &mut dyn RngCore, eye:  &Eye) -> Self {
         Self {

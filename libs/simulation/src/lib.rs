@@ -24,21 +24,18 @@ pub struct ParallelEngine {
     pub sims: Vec<Simulation>,
 }
 
-// Used for running initalizing simulations. Helpful for finding optimal params 
+// Used for running initalizing simulations. Helpful for finding optimal params
 pub struct Config {
-    fov_range: f32, //done 
-    fov_distance: f32, //done 
-    animal_count: usize, // 20,500 (done)
-    food_count: usize, //  20, 500 (done)
-    lifetime: usize, // number of steps before evolution 
-    brain_size: usize, 
+    fov_range: f32,           //done
+    fov_angle: f32,           //done
+    animal_count: usize,      // 20,500 (done)
+    food_count: usize,        //  20, 500 (done)
+    generation_length: usize, // number of steps before evolution (done)
+    brain_size: usize,
     mutation_rate: f32,
     selection_algorithm: todo!(), // Make a trait that gets implemented. Selection algorihtm
-                                  // follows the trait 
-    mutation_size: 0
-
+                                  // follows the trait
 }
-
 
 impl ParallelEngine {
     pub fn new() -> Self {
@@ -79,7 +76,7 @@ const SPEED_MIN: f32 = 0.001;
 const SPEED_MAX: f32 = 0.005;
 const SPEED_ACCEL: f32 = 0.2;
 const ROTATION_ACCEL: f32 = FRAC_PI_2;
-const GENERATION_LENGTH: usize = 2500; // the simulation runs for GENERATION_LENGTH before stopping.
+const GENERATION_LENGTH: usize = 2500; // the simulation runs for GENERATION_LENGTH before evolving.
 
 pub struct Simulation {
     id: Uuid,
@@ -87,6 +84,7 @@ pub struct Simulation {
     rng: ThreadRng,
     ga: ga::GeneticAlgorithm<ga::RouletteWheelSelection>,
     age: usize,
+    generation_length: usize,
 }
 
 // Signifying traits are  to be used by rayon.
@@ -95,15 +93,16 @@ unsafe impl Sync for Simulation {}
 
 impl From<Config> for Simulation {
     fn from(cfg: Config) -> Self {
-        let world = World::from(&cfg);
-        let rng = thread_rng();
+        let mut rng = thread_rng();
+        let world = World::from_with_rng(&cfg, &mut rng);
         let ga = ga::GeneticAlgorithm::from(&cfg);
         Self {
             id: Uuid::new_v4(),
             world,
             rng,
             ga,
-            age:0
+            age: 0,
+            generation_length: cfg.generation_length,
         }
     }
 }
@@ -114,7 +113,7 @@ impl Simulation {
         let rng = thread_rng();
         let ga = ga::GeneticAlgorithm::new(
             ga::RouletteWheelSelection,
-            ga::UniformCrossOver
+            ga::UniformCrossOver,
             ga::GuassianMutation::new(0.01, 0.03),
         );
 
@@ -124,6 +123,7 @@ impl Simulation {
             rng,
             ga,
             age: 0,
+            generation_length: GENERATION_LENGTH,
         }
     }
 
@@ -138,7 +138,7 @@ impl Simulation {
 
         self.age += 1;
 
-        if self.age > GENERATION_LENGTH {
+        if self.age > self.generation_length {
             let mut temp_rng = thread_rng();
             Some(self.evolve(&mut temp_rng))
         } else {

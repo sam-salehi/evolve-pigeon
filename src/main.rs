@@ -10,7 +10,7 @@ fn main() {
 
     let output = score
         .iter()
-        .map(|c| c.to_string()) // now valid, because Config: Display
+        .map(|c| c.to_string()) // now valid, because Config Display
         .collect::<Vec<_>>()
         .join("\n");
 

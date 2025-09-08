@@ -1,4 +1,5 @@
 use self::animal_individual::*;
+
 use lib_genetic_algorithm as ga;
 use lib_neural_network as nn;
 use nalgebra as na;
@@ -11,6 +12,7 @@ use rayon::iter::{
 };
 use rayon::prelude::*;
 use std::f32::consts::PI;
+use std::fmt;
 use uuid::Uuid;
 
 pub use self::{animal::*, brain::*, eye::*, food::*, world::*};
@@ -39,7 +41,19 @@ pub struct Config {
                          // follows the trait
 }
 
-// TODO: implement display for config.
+impl fmt::Display for Config {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "fov_range: {}, fov_angle: {}, animal_count: {}, food_count: {},generation_length: {}",
+            self.fov_range,
+            self.fov_angle,
+            self.animal_count,
+            self.food_count,
+            self.generation_length
+        )
+    }
+}
 
 fn range_with_step(start: f32, end: f32, step: f32) -> Vec<f32> {
     let mut values = Vec::new();

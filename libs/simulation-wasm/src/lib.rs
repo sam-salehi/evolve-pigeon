@@ -34,9 +34,7 @@ impl ParallelEngine {
         self.eng
             .worlds()
             .into_iter()
-            .map(|(id, world)| {
-               World::from_with_id(world,id) 
-            })
+            .map(|(id, world)| World::from_with_id(world, id))
             .collect()
     }
 }
@@ -73,12 +71,9 @@ impl Simulation {
     }
 }
 
-
-pub trait FromWithId<T,Id> {
-    fn from_with_id(value:T, id:Id) -> Self;
+pub trait FromWithId<T, Id> {
+    fn from_with_id(value: T, id: Id) -> Self;
 }
-
-
 
 #[wasm_bindgen]
 #[derive(Clone, Debug)]
@@ -97,12 +92,16 @@ impl From<&sim::World> for World {
     fn from(world: &sim::World) -> Self {
         let animals = world.animals().iter().map(Animal::from).collect();
         let foods = world.foods().iter().map(Food::from).collect();
-        Self { id:"null".to_string(), animals, foods }
+        Self {
+            id: "null".to_string(),
+            animals,
+            foods,
+        }
     }
 }
 
-impl FromWithId<&sim::World,String> for World {
-    fn from_with_id(world: &sim::World, id:String) -> Self {
+impl FromWithId<&sim::World, String> for World {
+    fn from_with_id(world: &sim::World, id: String) -> Self {
         let mut base = World::from(world);
         base.id = id;
         base

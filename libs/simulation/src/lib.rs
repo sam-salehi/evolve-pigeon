@@ -3,7 +3,6 @@ use self::animal_individual::*;
 use lib_genetic_algorithm as ga;
 use lib_neural_network as nn;
 use nalgebra as na;
-use once_cell::sync::Lazy;
 use rand::prelude::*;
 use rand::thread_rng;
 use rand::{Rng, RngCore};
@@ -12,14 +11,14 @@ use rayon::iter::{
 };
 use rayon::prelude::*;
 use std::f32::consts::PI;
-use std::fmt;
 use uuid::Uuid;
 
-pub use self::{animal::*, brain::*, eye::*, food::*, world::*};
+pub use self::{animal::*, brain::*, config::*, eye::*, food::*, world::*};
 
 mod animal;
 mod animal_individual;
 mod brain;
+mod config;
 mod eye;
 mod food;
 mod world;
@@ -28,95 +27,10 @@ pub struct ParallelEngine {
     pub sims: Vec<Simulation>,
 }
 
-// Used for running initalizing simulations. Helpful for finding optimal params
-#[derive(Debug, Clone)]
-pub struct Config {
-    fov_range: f32,      //done
-    fov_angle: f32,      //done
-    animal_count: usize, // 20,500 (done)
-    food_count: usize,   //  20, 500 (done)
-    generation_length: usize, // number of steps before evolution (done)
-                         // brain_size: usize, // TODO: not yet implemented
-                         // selection_algorithm: todo!(), // Make a trait that gets implemented. Selection algorihtm
-                         // follows the trait
-}
-
-impl fmt::Display for Config {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "fov_range: {}, fov_angle: {}, animal_count: {}, food_count: {},generation_length: {}",
-            self.fov_range,
-            self.fov_angle,
-            self.animal_count,
-            self.food_count,
-            self.generation_length
-        )
-    }
-}
-
-fn range_with_step(start: f32, end: f32, step: f32) -> Vec<f32> {
-    let mut values = Vec::new();
-    let mut x = start;
-
-    while x <= end {
-        values.push(x);
-        x += step;
-    }
-
-    values
-}
-
-fn range_with_step_usize(start: usize, end: usize, step: usize) -> Vec<usize> {
-    (start..=end).step_by(step).collect()
-}
-
-// used for generating multiple simulations.
-// TODO: move somewhere else.
-struct ConfigSpace {
-    fov_ranges: Vec<f32>,           // 0.1 to 1
-    fov_angles: Vec<f32>,           // 0.25pi to 2pi
-    animal_counts: Vec<usize>,      // 10 ti 80
-    food_counts: Vec<usize>,        // 20 to 100
-    generation_lengths: Vec<usize>, // 40 to 80
-}
-
-static DEFAULT_CONFIG_SPACE: Lazy<ConfigSpace> = Lazy::new(|| ConfigSpace {
-    fov_ranges: range_with_step(0.1, 1.0, 1.0),
-    fov_angles: range_with_step(0.25 * PI, 2.0 * PI, 2.0 * PI),
-    animal_counts: range_with_step_usize(10, 80, 80),
-    food_counts: range_with_step_usize(20, 100, 100),
-    generation_lengths: range_with_step_usize(500, 5000, 500),
-});
-
-impl ConfigSpace {
-    fn all_combinations(&self) -> Vec<Config> {
-        let mut configs = Vec::new();
-
-        for &fov_range in &self.fov_ranges {
-            for &fov_angle in &self.fov_angles {
-                for &animal_count in &self.animal_counts {
-                    for &food_count in &self.food_counts {
-                        for &generation_length in &self.generation_lengths {
-                            configs.push(Config {
-                                fov_range,
-                                fov_angle,
-                                animal_count,
-                                food_count,
-                                generation_length,
-                            })
-                        }
-                    }
-                }
-            }
-        }
-        configs
-    }
-}
 
 impl ParallelEngine {
     pub fn new() -> Self {
-        let configs = DEFAULT_CONFIG_SPACE.all_combinations();
+        let configs = get_default_configs();
         let sims = configs
             .into_iter()
             .map(|config| Simulation::from(config))
@@ -126,7 +40,7 @@ impl ParallelEngine {
         Self { sims }
     }
 
-    pub fn test_train(&mut self, total_steps: usize) -> Vec<&Config> {
+    pub fn test_train(&mut self, total_steps: usize) -> Vec<(usize, &Config)> {
         // Run all sims in parallel
         self.sims.par_iter_mut().for_each(|sim| {
             for _ in 0..total_steps {
@@ -145,7 +59,8 @@ impl ParallelEngine {
         scored_configs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
 
         // Return just the configs in sorted order
-        scored_configs.into_iter().map(|(_, cfg)| cfg).collect()
+        // scored_configs.into_iter().map(|(_, cfg)| cfg).collect()
+        scored_configs
     }
 
     pub fn step_all(&mut self) {
@@ -190,6 +105,7 @@ pub struct Simulation {
     age: usize,
     generation_length: usize,
     config: Option<Config>,
+    eye: Eye,
 }
 
 // Signifying traits are  to be used by rayon.
@@ -200,6 +116,8 @@ impl From<Config> for Simulation {
     fn from(cfg: Config) -> Self {
         let mut rng = thread_rng();
         let world = World::from_with_rng(&cfg, &mut rng);
+        let eye = Eye::from(cfg.fov_range, cfg.fov_angle, cfg.num_cells);
+
         let ga = ga::GeneticAlgorithm::new(
             ga::RouletteWheelSelection,
             ga::UniformCrossOver,
@@ -215,6 +133,7 @@ impl From<Config> for Simulation {
             age: 0,
             generation_length: cfg.generation_length,
             config: Some(cfg),
+            eye,
         }
     }
 }
@@ -223,6 +142,7 @@ impl Simulation {
     pub fn random() -> Self {
         let world = World::random(&mut thread_rng());
         let rng = thread_rng();
+        let eye = Eye::default();
         let ga = ga::GeneticAlgorithm::new(
             ga::RouletteWheelSelection,
             ga::UniformCrossOver,
@@ -237,6 +157,7 @@ impl Simulation {
             age: 0,
             generation_length: GENERATION_LENGTH,
             config: None,
+            eye,
         }
     }
 
@@ -280,7 +201,7 @@ impl Simulation {
 
         self.world.animals = evolved_population
             .into_iter()
-            .map(|individual| individual.into_animal(rng))
+            .map(|individual| individual.into_animal(self.eye.clone(), rng))
             .collect();
 
         for food in &mut self.world.foods {

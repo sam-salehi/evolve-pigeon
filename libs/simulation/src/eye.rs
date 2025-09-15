@@ -5,7 +5,7 @@ const FOV_RANGE: f32 = 0.25;
 const FOV_ANGLE: f32 = PI + FRAC_PI_4;
 const CELLS: usize = 9;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Eye {
     fov_range: f32,
     fov_angle: f32,
@@ -25,9 +25,9 @@ impl Eye {
         }
     }
 
-    pub fn from(fov_range: f32, fov_angle: f32) -> Self {
+    pub fn from(fov_range: f32, fov_angle: f32, cells: usize) -> Self {
         // TODO: implement traint instead. pass config in.
-        Eye::new(fov_range, fov_angle, CELLS)
+        Eye::new(fov_range, fov_angle, cells)
     }
 
     pub fn cells(&self) -> usize {

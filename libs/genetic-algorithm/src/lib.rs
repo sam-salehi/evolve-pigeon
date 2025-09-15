@@ -1,3 +1,5 @@
+use rand::distributions::Distribution;
+use rand::distributions::WeightedIndex;
 use rand::seq::SliceRandom;
 use rand::{Rng, RngCore};
 

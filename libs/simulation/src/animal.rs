@@ -12,7 +12,7 @@ pub struct Animal {
 
 impl FromWithRng<Animal> for Animal {
     fn from_with_rng(cfg: &Config, rng: &mut dyn RngCore) -> Animal {
-        let eye = Eye::from(cfg.fov_range, cfg.fov_angle);
+        let eye = Eye::from(cfg.fov_range, cfg.fov_angle, cfg.num_cells);
         let brain = Brain::random(rng, &eye);
         Self::new(eye, brain, rng)
     }
@@ -25,8 +25,7 @@ impl Animal {
         Self::new(eye, brain, rng)
     }
 
-    pub(crate) fn from_chromosome(chromosome: ga::Chromosome, rng: &mut dyn RngCore) -> Self {
-        let eye = Eye::default();
+    pub(crate) fn from_chromosome(chromosome: ga::Chromosome, eye: Eye, rng: &mut dyn RngCore) -> Self {
         let brain = Brain::from_chromosome(chromosome, &eye);
         Self::new(eye, brain, rng)
     }

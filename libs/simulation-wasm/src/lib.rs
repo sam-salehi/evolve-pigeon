@@ -1,9 +1,53 @@
-use js_sys;
 use lib_simulation as sim;
 use rand::prelude::*;
 use uuid::Uuid;
-use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+#[derive(Clone, Debug)]
+pub struct Config {
+    pub fov_range: f32,
+    pub fov_angle: f32,
+    pub animal_count: usize,
+    pub food_count: usize,
+    pub generation_length: usize,
+    pub num_cells: usize,
+}
+
+#[wasm_bindgen]
+impl Config {
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        fov_range: f32,
+        fov_angle: f32,
+        animal_count: usize,
+        food_count: usize,
+        generation_length: usize,
+        num_cells: usize,
+    ) -> Self {
+        Self {
+            fov_range,
+            fov_angle,
+            animal_count,
+            food_count,
+            generation_length,
+            num_cells,
+        }
+    }
+}
+
+impl From<Config> for sim::Config {
+    fn from(config: Config) -> Self {
+        sim::Config {
+            fov_range: config.fov_range,
+            fov_angle: config.fov_angle,
+            animal_count: config.animal_count,
+            food_count: config.food_count,
+            generation_length: config.generation_length,
+            num_cells: config.num_cells,
+        }
+    }
+}
 
 #[wasm_bindgen]
 pub struct ParallelEngine {
@@ -15,7 +59,7 @@ pub struct ParallelEngine {
 impl ParallelEngine {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        let mut rng = thread_rng();
+        let rng = thread_rng();
         let eng = sim::ParallelEngine::new();
 
         Self { rng, eng }
@@ -49,8 +93,16 @@ pub struct Simulation {
 impl Simulation {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        let mut rng = thread_rng();
+        let rng = thread_rng();
         let sim = sim::Simulation::random();
+        Self { rng, sim }
+    }
+
+    #[wasm_bindgen]
+    pub fn new_with_config(config: &Config) -> Self {
+        let rng = thread_rng();
+        let sim_config = sim::Config::from(config.clone());
+        let sim = sim::Simulation::from(sim_config);
         Self { rng, sim }
     }
 

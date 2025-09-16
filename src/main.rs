@@ -10,7 +10,7 @@ fn main() {
     // TODO: just display one simulation in frotend. That should be the end of it. Hopefull.
 
     println!("Beginning simulation");
-    let score = eng.test_train(10000);
+    let score = eng.test_train(5000);
 
     let output = score
         .iter()

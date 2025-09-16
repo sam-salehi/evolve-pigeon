@@ -69,6 +69,62 @@ impl SelectionMethod for RouletteWheelSelection {
     }
 }
 
+pub struct TournamentSelection {
+    tournament_size: usize,
+}
+
+impl TournamentSelection {
+    // Takes the best creature and pushes on to next iteration.
+    pub fn new(tournament_size: usize) -> Self {
+        Self { tournament_size }
+    }
+}
+
+impl SelectionMethod for TournamentSelection {
+    fn select<'a, I>(&self, rng: &mut dyn RngCore, population: &'a [I]) -> &'a I
+    where
+        I: Individual,
+    {
+        let tournament_size = self.tournament_size.min(population.len());
+        let tournament: Vec<_> = population.choose_multiple(rng, tournament_size).collect();
+
+        tournament
+            .into_iter()
+            .max_by(|a, b| a.fitness().partial_cmp(&b.fitness()).unwrap())
+            .expect("Tournament should not be empty")
+    }
+}
+
+pub struct RankSelection;
+
+impl SelectionMethod for RankSelection {
+    fn select<'a, I>(&self, rng: &mut dyn RngCore, population: &'a [I]) -> &'a I
+    where
+        I: Individual,
+    {
+        // Create indices and sort by fitness
+        let mut indices: Vec<usize> = (0..population.len()).collect();
+        indices.sort_by(|&a, &b| {
+            population[a]
+                .fitness()
+                .partial_cmp(&population[b].fitness())
+                .unwrap()
+        });
+
+        // Create rank-based weights (linear ranking)
+        let weights: Vec<f32> = (1..=indices.len()).map(|rank| rank as f32).collect();
+
+        // Select based on rank weights
+        let selected_index = indices
+            .choose_weighted(rng, |&index| {
+                weights[indices.iter().position(|&x| x == index).unwrap()]
+            })
+            .expect("Population should not be empty");
+
+        &population[*selected_index]
+    }
+}
+
 use std::ops::Index;
 
 #[derive(Clone, Debug)]
@@ -145,6 +201,60 @@ impl CrossoverMethod for UniformCrossOver {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct SinglePointCrossOver;
+
+impl CrossoverMethod for SinglePointCrossOver {
+    fn crossover(
+        &self,
+        rng: &mut dyn RngCore,
+        parent_a: &Chromosome,
+        parent_b: &Chromosome,
+    ) -> Chromosome {
+        assert_eq!(parent_a.len(), parent_b.len());
+
+        if parent_a.len() <= 1 {
+            return parent_a.clone();
+        }
+
+        let crossover_point = rng.gen_range(1..parent_a.len());
+
+        let mut child_genes = Vec::with_capacity(parent_a.len());
+        child_genes.extend(parent_a.iter().take(crossover_point));
+        child_genes.extend(parent_b.iter().skip(crossover_point));
+
+        child_genes.into_iter().collect()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ArithmeticCrossOver {
+    alpha: f32,
+}
+
+impl ArithmeticCrossOver {
+    pub fn new(alpha: f32) -> Self {
+        Self { alpha }
+    }
+}
+
+impl CrossoverMethod for ArithmeticCrossOver {
+    fn crossover(
+        &self,
+        _rng: &mut dyn RngCore,
+        parent_a: &Chromosome,
+        parent_b: &Chromosome,
+    ) -> Chromosome {
+        assert_eq!(parent_a.len(), parent_b.len());
+
+        parent_a
+            .iter()
+            .zip(parent_b.iter())
+            .map(|(&a, &b)| self.alpha * a + (1.0 - self.alpha) * b)
+            .collect()
+    }
+}
+
 pub trait MutationMethod {
     fn mutate(&self, rng: &mut dyn RngCore, child: &mut Chromosome);
 }
@@ -167,6 +277,55 @@ impl MutationMethod for GuassianMutation {
             let sign = if rng.gen_bool(0.5) { -1.0 } else { 1.0 };
             if rng.gen_bool(self.chance as f64) {
                 *gene += sign * self.coeff * rng.r#gen::<f32>();
+            }
+        }
+    }
+}
+
+pub struct UniformMutation {
+    chance: f32,
+    min: f32,
+    max: f32,
+}
+
+impl UniformMutation {
+    pub fn new(chance: f32, min: f32, max: f32) -> Self {
+        assert!(chance >= 0.0 && chance <= 1.0);
+        assert!(min <= max);
+        Self { chance, min, max }
+    }
+}
+
+impl MutationMethod for UniformMutation {
+    fn mutate(&self, rng: &mut dyn RngCore, child: &mut Chromosome) {
+        for gene in child.iter_mut() {
+            if rng.gen_bool(self.chance as f64) {
+                *gene = rng.gen_range(self.min..=self.max);
+            }
+        }
+    }
+}
+
+pub struct CauchyMutation {
+    chance: f32,
+    scale: f32,
+}
+
+impl CauchyMutation {
+    pub fn new(chance: f32, scale: f32) -> Self {
+        assert!(chance >= 0.0 && chance <= 1.0);
+        Self { chance, scale }
+    }
+}
+
+impl MutationMethod for CauchyMutation {
+    fn mutate(&self, rng: &mut dyn RngCore, child: &mut Chromosome) {
+        for gene in child.iter_mut() {
+            if rng.gen_bool(self.chance as f64) {
+                // Generate Cauchy-distributed random number
+                let u = rng.r#gen::<f32>() - 0.5;
+                let cauchy_value = self.scale * (u / (1.0 - u.abs())).tan();
+                *gene += cauchy_value;
             }
         }
     }

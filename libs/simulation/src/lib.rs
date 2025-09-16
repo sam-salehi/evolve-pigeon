@@ -7,7 +7,7 @@ use rand::prelude::*;
 use rand::thread_rng;
 use rand::{Rng, RngCore};
 use rayon::iter::{
-    IntoParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
+    IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
 use rayon::prelude::*;
 use std::f32::consts::PI;
@@ -118,13 +118,8 @@ impl From<Config> for Simulation {
         let world = World::from_with_rng(&cfg, &mut rng);
         let eye = Eye::from(cfg.fov_range, cfg.fov_angle, cfg.num_cells);
 
-        let ga = ga::GeneticAlgorithm::new(
-            ga::RouletteWheelSelection,
-            ga::UniformCrossOver,
-            ga::GuassianMutation::new(0.01, 0.03),
-        );
+        let ga = cfg.evolutionary_algorithm.create_genetic_algorithm();
 
-        // let ga = ga::GeneticAlgorithm::from(&cfg);
         Self {
             id: Uuid::new_v4(),
             world,
@@ -143,11 +138,14 @@ impl Simulation {
         let world = World::random(&mut thread_rng());
         let rng = thread_rng();
         let eye = Eye::default();
-        let ga = ga::GeneticAlgorithm::new(
-            ga::RouletteWheelSelection,
-            ga::UniformCrossOver,
-            ga::GuassianMutation::new(0.01, 0.03),
-        );
+        
+        // Use default algorithm for random simulations
+        let default_algorithm = EvolutionaryAlgorithm::StandardGA {
+            selection: SelectionType::RouletteWheel,
+            crossover: CrossoverType::Uniform,
+            mutation: MutationType::Gaussian { chance: 0.01, coeff: 0.03 },
+        };
+        let ga = default_algorithm.create_genetic_algorithm();
 
         Self {
             id: Uuid::new_v4(),

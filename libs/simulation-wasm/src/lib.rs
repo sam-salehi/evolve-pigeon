@@ -45,6 +45,14 @@ impl From<Config> for sim::Config {
             food_count: config.food_count,
             generation_length: config.generation_length,
             num_cells: config.num_cells,
+            evolutionary_algorithm: lib_simulation::EvolutionaryAlgorithm::ConservativeGA {
+                selection: lib_simulation::SelectionType::RouletteWheel,
+                crossover: lib_simulation::CrossoverType::Uniform,
+                mutation: lib_simulation::MutationType::Gaussian {
+                    chance: 0.01,
+                    coeff: 0.1,
+                },
+            },
         }
     }
 }
